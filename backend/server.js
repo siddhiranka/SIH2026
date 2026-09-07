@@ -4,6 +4,7 @@ const path = require('path');
 require('dotenv').config();
 
 const connectDB = require('./config/db');
+const mongoose = require('mongoose');
 const authRoutes = require('./routes/auth.routes');
 const studentRoutes = require('./routes/student.routes');
 const teacherRoutes = require('./routes/teacher.routes');
@@ -13,13 +14,25 @@ const uploadRoutes = require('./routes/upload.routes');
 
 const app = express();
 
-// Connect Database
+// Ensure DB connected on startup
 connectDB();
 
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
+
+// Ensure DB connection for serverless function invocations (Vercel)
+app.use(async (req, res, next) => {
+  if (mongoose.connection.readyState === 0) {
+    try {
+      await connectDB();
+    } catch (e) {
+      console.error('[DB Reconnect Error]:', e.message);
+    }
+  }
+  next();
+});
 
 // Serve Uploaded Files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
