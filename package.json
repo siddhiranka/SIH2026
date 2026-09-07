@@ -5,8 +5,8 @@
   "private": true,
   "main": "api/index.js",
   "scripts": {
-    "build": "cd frontend && npm install && npm run build",
-    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "build": "node -e \"const fs=require('fs'),{execSync}=require('child_process'); if(fs.existsSync('frontend')){execSync('npm --prefix frontend install && npm --prefix frontend run build',{stdio:'inherit'})}else{execSync('npm run build',{stdio:'inherit'})}\"",
+    "install:all": "npm install && npm --prefix backend install && npm --prefix frontend install",
     "start": "node backend/server.js"
   },
   "dependencies": {
