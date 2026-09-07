@@ -3,11 +3,14 @@ import { Bot, Send, Sparkles, User, Loader2, Globe } from 'lucide-react';
 import VoiceMicButton from '../components/VoiceMicButton';
 import api from '../utils/api';
 import { SUPPORTED_LANGUAGES } from '../utils/speech';
+import { useAuth } from '../context/AuthContext';
 
 const AITutorPage = () => {
+  const { user, updateLanguage } = useAuth();
   const [subject, setSubject] = useState('Mathematics');
   const [preferredLanguage, setPreferredLanguage] = useState(() => {
-    return localStorage.getItem('user_language') || 'English';
+    // Use the MongoDB-persisted language from user context, fall back to localStorage
+    return user?.preferredLanguage || localStorage.getItem('user_language') || 'English';
   });
 
   const [messages, setMessages] = useState([
@@ -20,10 +23,12 @@ const AITutorPage = () => {
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleLanguageChange = (e) => {
+  const handleLanguageChange = async (e) => {
     const newLang = e.target.value;
     setPreferredLanguage(newLang);
     localStorage.setItem('user_language', newLang);
+    // Also persist to MongoDB via AuthContext
+    if (updateLanguage) await updateLanguage(newLang).catch(() => {});
   };
 
   const handleSend = async (customText) => {

@@ -226,6 +226,8 @@ router.get('/lessons/:id', protect, async (req, res) => {
     if (!c) return res.status(404).json({ message: 'Lesson not found' });
     res.json({
       _id: c._id,
+      type: c.type || 'text',
+      contentType: c.type || 'text',
       subjectName: c.subject,
       chapterNumber: 1,
       chapterTitle: c.subject,
@@ -234,7 +236,7 @@ router.get('/lessons/:id', protect, async (req, res) => {
       content: c.content,
       fileUrl: c.fileUrl || '',
       link: c.link || '',
-      videoUrl: c.link || '',
+      videoUrl: c.videoUrl || c.link || '',
       keyConcepts: [],
       quiz: []
     });
@@ -280,6 +282,9 @@ router.get('/quizzes/:id', protect, async (req, res) => {
     const quiz = await Quiz.findOne({ _id: req.params.id, status: 'published' });
     if (!quiz) return res.status(404).json({ message: 'Quiz not found' });
 
+    // Check if the student has already attempted this quiz (1-attempt limit)
+    const existingAttempt = await QuizAttempt.findOne({ quizId: quiz._id, studentId: req.user._id }).sort({ submittedAt: -1 });
+
     // Return questions WITHOUT exposing correctAnswerIndex to avoid client inspect cheating
     const sanitizedQuestions = quiz.questions.map((q, idx) => ({
       _id: q._id,
@@ -296,19 +301,42 @@ router.get('/quizzes/:id', protect, async (req, res) => {
       className: quiz.className,
       totalMarks: quiz.totalMarks,
       timeLimitMinutes: quiz.timeLimitMinutes,
-      questions: sanitizedQuestions
+      questions: sanitizedQuestions,
+      alreadyAttempted: !!existingAttempt,
+      previousAttempt: existingAttempt ? {
+        score: existingAttempt.score,
+        totalMarks: existingAttempt.totalMarks,
+        percentage: existingAttempt.percentage,
+        submittedAt: existingAttempt.submittedAt,
+        attemptNumber: existingAttempt.attemptNumber
+      } : null
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
 
-// Submit a quiz attempt and calculate score
+// Submit a quiz attempt and calculate score (Only 1 attempt allowed)
 router.post('/quizzes/:id/attempt', protect, async (req, res) => {
   try {
     const { answers } = req.body; // array of { questionIndex, selectedOptionIndex }
     const quiz = await Quiz.findOne({ _id: req.params.id, status: 'published' });
     if (!quiz) return res.status(404).json({ message: 'Quiz not found' });
+
+    // Strictly enforce 1-attempt rule
+    const existingAttempt = await QuizAttempt.findOne({ quizId: quiz._id, studentId: req.user._id });
+    if (existingAttempt) {
+      return res.status(400).json({
+        message: 'You have already attempted this quiz. Only 1 attempt is allowed.',
+        attempt: {
+          score: existingAttempt.score,
+          totalMarks: existingAttempt.totalMarks,
+          percentage: existingAttempt.percentage,
+          attemptNumber: existingAttempt.attemptNumber,
+          submittedAt: existingAttempt.submittedAt
+        }
+      });
+    }
 
     let score = 0;
     const evaluatedAnswers = (answers || []).map(ans => {
@@ -327,8 +355,6 @@ router.post('/quizzes/:id/attempt', protect, async (req, res) => {
     const totalMarks = quiz.totalMarks || quiz.questions.length;
     const percentage = totalMarks > 0 ? Number(((score / totalMarks) * 100).toFixed(1)) : 0;
 
-    const previousAttemptsCount = await QuizAttempt.countDocuments({ quizId: quiz._id, studentId: req.user._id });
-
     const attempt = await QuizAttempt.create({
       quizId: quiz._id,
       quizTitle: quiz.title,
@@ -340,7 +366,7 @@ router.post('/quizzes/:id/attempt', protect, async (req, res) => {
       score,
       totalMarks,
       percentage,
-      attemptNumber: previousAttemptsCount + 1,
+      attemptNumber: 1,
       submittedAt: new Date()
     });
 
@@ -355,7 +381,7 @@ router.post('/quizzes/:id/attempt', protect, async (req, res) => {
         score,
         totalMarks,
         percentage,
-        attemptNumber: attempt.attemptNumber,
+        attemptNumber: 1,
         submittedAt: attempt.submittedAt
       }
     });
@@ -378,20 +404,54 @@ router.get('/quiz-history', protect, async (req, res) => {
 router.get('/progress', protect, async (req, res) => {
   try {
     const studentId = req.user._id;
-    const attempts = await QuizAttempt.find({ studentId });
+    const attempts = await QuizAttempt.find({ studentId }).sort({ submittedAt: -1 });
     const submissions = await Submission.find({ studentId });
 
     const totalQuizzes = attempts.length;
-    const averageScore = totalQuizzes > 0 
+
+    // Calculate overall average from all quiz attempts
+    const overallAverage = totalQuizzes > 0
       ? Number((attempts.reduce((sum, a) => sum + a.percentage, 0) / totalQuizzes).toFixed(1))
       : 0;
 
+    // Group attempts by subject to compute per-subject averages
+    const subjectMap = {};
+    for (const a of attempts) {
+      const sub = a.subject || 'General';
+      if (!subjectMap[sub]) subjectMap[sub] = { total: 0, count: 0 };
+      subjectMap[sub].total += a.percentage;
+      subjectMap[sub].count += 1;
+    }
+
+    const subjects = Object.entries(subjectMap).map(([name, data]) => ({
+      name,
+      score: Math.round(data.total / data.count),
+      weakArea: data.total / data.count < 60 ? 'Needs Practice' : 'Keep it up!'
+    }));
+
+    // If no quiz data, show empty state
+    const noDataYet = totalQuizzes === 0 && submissions.length === 0;
+
+    const badges = req.user.badges && req.user.badges.length > 0 ? req.user.badges : [];
+
+    // Count lessons completed by querying the learningPoints milestones (or simply from user)
+    const lessonsCompletedCount = req.user.learningPoints
+      ? Math.floor(req.user.learningPoints / 15) // each lesson gives 15 pts
+      : 0;
+
     res.json({
+      noDataYet,
+      overall: overallAverage > 0 ? Math.round(overallAverage) : 0,
+      lessonsCompleted: lessonsCompletedCount,
+      assignmentsSubmitted: submissions.length,
+      quizAverage: overallAverage,
       learningPoints: req.user.learningPoints || 0,
       streak: req.user.streak || 0,
+      badges,
+      subjects,
       totalQuizzesAttempted: totalQuizzes,
-      averageQuizScore: averageScore,
-      assignmentsSubmitted: submissions.length,
+      averageQuizScore: overallAverage,
+      assignmentsSubmittedCount: submissions.length,
       recentQuizAttempts: attempts.slice(0, 5),
       recentSubmissions: submissions.slice(0, 5)
     });
@@ -399,6 +459,7 @@ router.get('/progress', protect, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
 
 // Student update class code
 router.post('/update-class', protect, async (req, res) => {

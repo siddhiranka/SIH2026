@@ -11,6 +11,8 @@ export default {
           orange: '#F47C20',
           'orange-light': '#FFF1E6',
           'orange-soft': '#FFE0C2',
+          purple: '#6C4DF6',
+          'purple-light': '#F3F0FF',
           bg: '#FFFFFF',
           card: '#FFFFFF',
           text: '#333333',

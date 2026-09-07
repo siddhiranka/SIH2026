@@ -30,6 +30,11 @@ const TeacherContentPage = () => {
   const [aiLoading, setAiLoading] = useState(false);
   const [showAiInput, setShowAiInput] = useState(false);
 
+  // File upload state
+  const [fileUploading, setFileUploading] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState('');
+  const [uploadedFileMime, setUploadedFileMime] = useState('');
+
   const [message, setMessage] = useState('');
 
   const fetchContent = async () => {
@@ -107,6 +112,41 @@ const TeacherContentPage = () => {
       console.error('AI Generate Content error:', err);
     } finally {
       setAiLoading(false);
+    }
+  };
+
+  const handleFileUpload = async (file) => {
+    if (!file) return;
+    setFileUploading(true);
+    setUploadedFileName(file.name);
+    setUploadedFileMime(file.type);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const token = localStorage.getItem('learnmate_token');
+      const res = await fetch(
+        (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/$/, '') : '') + '/api/upload',
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData
+        }
+      );
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'Upload failed');
+      }
+      const data = await res.json();
+      setFileUrl(data.url);
+      setMessage('File uploaded successfully! ✅');
+      setTimeout(() => setMessage(''), 4000);
+    } catch (err) {
+      console.error('File upload error:', err);
+      alert('File upload failed: ' + err.message);
+      setFileUrl('');
+      setUploadedFileName('');
+    } finally {
+      setFileUploading(false);
     }
   };
 
@@ -455,25 +495,37 @@ const TeacherContentPage = () => {
               )}
 
               {type === 'file' && (
-                <div>
+                <div className="space-y-2">
                   <label className="block text-xs font-bold text-brand-text mb-1">Upload File / Document</label>
                   <input
                     type="file"
+                    accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp,.mp4,.webm,.txt"
                     onChange={(e) => {
-                      if(e.target.files && e.target.files[0]) {
-                        const file = e.target.files[0];
-  const reader = new FileReader();
-  reader.onloadend = () => {
-    setFileUrl(reader.result);
-    alert('File loaded successfully!');
-  };
-  reader.readAsDataURL(file);
+                      if (e.target.files && e.target.files[0]) {
+                        handleFileUpload(e.target.files[0]);
                       }
                     }}
                     className="w-full bg-brand-orange-light/40 border border-orange-200 rounded-2xl p-2.5 text-xs font-medium focus:outline-none text-brand-text"
                   />
+                  {fileUploading && (
+                    <div className="flex items-center gap-2 text-brand-orange text-xs font-semibold animate-pulse">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading to cloud...
+                    </div>
+                  )}
+                  {fileUrl && !fileUploading && (
+                    <div className="flex items-center gap-2 text-emerald-700 text-xs font-semibold bg-emerald-50 border border-emerald-200 rounded-xl p-2.5">
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      <div className="min-w-0">
+                        <div className="font-bold truncate">{uploadedFileName || 'File uploaded'}</div>
+                        <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline text-[10px] truncate block">
+                          {fileUrl}
+                        </a>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
+
 
               {/* AI Content Assistant Toggle (PRD Item 9) */}
               <div className="bg-brand-orange-light/60 rounded-2xl p-4 border border-orange-200 space-y-3">

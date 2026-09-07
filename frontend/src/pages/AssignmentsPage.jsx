@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Upload, CheckCircle2, Clock, Send, Sparkles, Mic, Paperclip } from 'lucide-react';
+import { FileText, Upload, CheckCircle2, Clock, Send, Sparkles, Mic, Paperclip, Loader2 } from 'lucide-react';
 import api from '../utils/api';
 import VoiceMicButton from '../components/VoiceMicButton';
 import { useAuth } from '../context/AuthContext';
 
 const AssignmentsPage = () => {
-  const { updateUserStats } = useAuth();
+  const { user, updateUserStats } = useAuth();
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [translating, setTranslating] = useState(false);
   const [selectedAssign, setSelectedAssign] = useState(null);
   const [textAnswer, setTextAnswer] = useState('');
   const [file, setFile] = useState(null);
@@ -17,7 +18,37 @@ const AssignmentsPage = () => {
   const fetchAssignments = async () => {
     try {
       const res = await api.get('/student/assignments');
-      setAssignments(res.data);
+      let data = res.data || [];
+
+      // Translate descriptions if student has a non-English preference
+      const lang = user?.preferredLanguage || localStorage.getItem('user_language') || 'English';
+      if (lang && lang !== 'English' && data.length > 0) {
+        setTranslating(true);
+        try {
+          data = await Promise.all(
+            data.map(async (a) => {
+              const textToTranslate = [a.title, a.description].filter(Boolean).join('\n|||SEP|||');
+              const tRes = await api.post('/ai/translate', {
+                content: textToTranslate,
+                targetLanguage: lang
+              });
+              const translated = tRes.data.translatedContent || textToTranslate;
+              const parts = translated.split('|||SEP|||');
+              return {
+                ...a,
+                title: parts[0]?.trim() || a.title,
+                description: parts[1]?.trim() || a.description
+              };
+            })
+          );
+        } catch (tErr) {
+          console.warn('Assignment translation failed:', tErr);
+        } finally {
+          setTranslating(false);
+        }
+      }
+
+      setAssignments(data);
     } catch (err) {
       console.error('Fetch assignments error:', err);
     } finally {
@@ -27,7 +58,8 @@ const AssignmentsPage = () => {
 
   useEffect(() => {
     fetchAssignments();
-  }, []);
+  }, [user?.preferredLanguage]);
+
 
   const handleSubmitAssignment = async (e) => {
     e.preventDefault();

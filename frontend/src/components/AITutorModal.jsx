@@ -3,17 +3,19 @@ import { Bot, X, Send, Sparkles, User, Loader2, Globe } from 'lucide-react';
 import VoiceMicButton from './VoiceMicButton';
 import api from '../utils/api';
 import { SUPPORTED_LANGUAGES } from '../utils/speech';
+import { useAuth } from '../context/AuthContext';
 
 const AITutorModal = ({ isOpen, onClose, subject = "Mathematics", lessonContext = "" }) => {
+  const { user, updateLanguage } = useAuth();
   const [preferredLanguage, setPreferredLanguage] = useState(() => {
-    return localStorage.getItem('user_language') || 'English';
+    return user?.preferredLanguage || localStorage.getItem('user_language') || 'English';
   });
 
   const [messages, setMessages] = useState([
     {
       id: 1,
       sender: 'ai',
-      text: `Hi Rahul! 👋 I'm your LearnMate AI Tutor. What would you like help with in ${subject} today? Ask me any question in your preferred language!`
+      text: `Hi ${user?.name || 'there'}! 👋 I'm your LearnMate AI Tutor. What would you like help with in ${subject} today? Ask me any question in your preferred language!`
     }
   ]);
   const [inputText, setInputText] = useState('');
@@ -21,11 +23,13 @@ const AITutorModal = ({ isOpen, onClose, subject = "Mathematics", lessonContext 
 
   if (!isOpen) return null;
 
-  const handleLanguageChange = (e) => {
+  const handleLanguageChange = async (e) => {
     const newLang = e.target.value;
     setPreferredLanguage(newLang);
     localStorage.setItem('user_language', newLang);
+    if (updateLanguage) await updateLanguage(newLang).catch(() => {});
   };
+
 
   const handleSend = async (questionText) => {
     const query = questionText || inputText;

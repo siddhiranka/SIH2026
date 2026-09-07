@@ -14,7 +14,6 @@ const LoginPage = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [classCode, setClassCode] = useState('');
   const [preferredLanguage, setPreferredLanguage] = useState('English');
   
   const [error, setError] = useState('');
@@ -38,7 +37,6 @@ const LoginPage = () => {
       try {
         const payload = { name, email, password, role };
         if (role === 'student') {
-          payload.classCode = classCode;
           payload.preferredLanguage = preferredLanguage;
         }
 
@@ -73,7 +71,7 @@ const LoginPage = () => {
           <button
             type="button"
             onClick={() => { setRole('student'); setError(''); }}
-            className={`flex-1 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 ${role === 'student' ? 'bg-brand-orange text-white shadow-sm' : 'text-brand-muted hover:text-brand-text'}`}
+            className={`flex-1 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer ${role === 'student' ? 'bg-brand-orange text-white shadow-sm' : 'text-brand-muted hover:text-brand-text'}`}
           >
             <GraduationCap className="w-4 h-4" />
             <span>Student</span>
@@ -81,7 +79,7 @@ const LoginPage = () => {
           <button
             type="button"
             onClick={() => { setRole('teacher'); setError(''); }}
-            className={`flex-1 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 ${role === 'teacher' ? 'bg-brand-orange text-white shadow-sm' : 'text-brand-muted hover:text-brand-text'}`}
+            className={`flex-1 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer ${role === 'teacher' ? 'bg-brand-orange text-white shadow-sm' : 'text-brand-muted hover:text-brand-text'}`}
           >
             <User className="w-4 h-4" />
             <span>Teacher</span>
@@ -124,28 +122,18 @@ const LoginPage = () => {
           </div>
 
           {!isLogin && role === 'student' && (
-            <>
-              <div>
-                <label className="block text-xs font-bold text-brand-text mb-1">Class Code</label>
-                <div className="relative">
-                  <Key className="w-5 h-5 text-gray-400 absolute left-4 top-3.5" />
-                  <input type="text" required value={classCode} onChange={(e) => setClassCode(e.target.value.toUpperCase())} placeholder="ABC123" className="w-full bg-white border border-orange-200 rounded-2xl pl-12 pr-4 py-3 text-sm font-medium text-brand-text uppercase focus:outline-none focus:ring-2 focus:ring-brand-orange/50" />
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-xs font-bold text-brand-text mb-1">Preferred Language</label>
-                <select value={preferredLanguage} onChange={(e) => setPreferredLanguage(e.target.value)} className="w-full bg-white border border-orange-200 rounded-2xl px-4 py-3 text-sm font-medium text-brand-text focus:outline-none focus:ring-2 focus:ring-brand-orange/50">
-                  <option value="English">English</option>
-                  <option value="Hindi">Hindi</option>
+            <div>
+              <label className="block text-xs font-bold text-brand-text mb-1">Preferred Language</label>
+              <select value={preferredLanguage} onChange={(e) => setPreferredLanguage(e.target.value)} className="w-full bg-white border border-orange-200 rounded-2xl px-4 py-3 text-sm font-medium text-brand-text focus:outline-none focus:ring-2 focus:ring-brand-orange/50">
+                <option value="English">English</option>
+                <option value="Hindi">Hindi</option>
                   <option value="Marathi">Marathi</option>
                   <option value="Gujarati">Gujarati</option>
                   <option value="Bengali">Bengali</option>
                   <option value="Tamil">Tamil</option>
                   <option value="Telugu">Telugu</option>
                 </select>
-              </div>
-            </>
+            </div>
           )}
 
           <button type="submit" disabled={isSubmitting} className="w-full py-3.5 bg-brand-orange hover:bg-orange-600 text-white font-bold rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 text-sm mt-4 disabled:opacity-50">

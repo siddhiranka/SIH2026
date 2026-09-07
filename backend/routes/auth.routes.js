@@ -51,13 +51,12 @@ router.post('/register', async (req, res) => {
     let classObj = null;
     let studentId = '';
 
-    // If student is registering, they must provide a valid classCode
-    if (role === 'student') {
-      if (!classCode) return res.status(400).json({ message: 'Class Code is required for students' });
-      const cleanCode = classCode.trim().toUpperCase();
-      classObj = await Class.findOne({ classCode: cleanCode });
-      if (!classObj) return res.status(400).json({ message: 'Invalid class code. Please check with your teacher.' });
+    if (role === 'student' || !role) {
       studentId = `STU-${Math.floor(1000 + Math.random() * 9000)}`;
+      if (classCode && classCode.trim()) {
+        const cleanCode = classCode.trim().toUpperCase();
+        classObj = await Class.findOne({ classCode: cleanCode });
+      }
     }
 
     const existingUser = await User.findOne({ email });
@@ -102,6 +101,41 @@ router.post('/register', async (req, res) => {
 // @route GET /api/auth/me
 router.get('/me', protect, async (req, res) => {
   res.json(req.user);
+});
+
+// @route PATCH /api/auth/update-profile
+// Update user's preferredLanguage or other profile fields
+router.patch('/update-profile', protect, async (req, res) => {
+  try {
+    const { preferredLanguage, name, avatar } = req.body;
+    const updateFields = {};
+    if (preferredLanguage) updateFields.preferredLanguage = preferredLanguage;
+    if (name) updateFields.name = name;
+    if (avatar) updateFields.avatar = avatar;
+
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user._id,
+      { $set: updateFields },
+      { new: true }
+    ).select('-password');
+
+    res.json({
+      _id: updatedUser._id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      role: updatedUser.role,
+      studentId: updatedUser.studentId,
+      classId: updatedUser.classId,
+      className: updatedUser.className,
+      preferredLanguage: updatedUser.preferredLanguage,
+      learningPoints: updatedUser.learningPoints,
+      streak: updatedUser.streak,
+      avatar: updatedUser.avatar,
+      badges: updatedUser.badges
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 });
 
 module.exports = router;

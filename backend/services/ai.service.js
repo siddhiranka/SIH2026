@@ -119,10 +119,23 @@ Return ONLY a valid JSON array of objects, with NO markdown blocks or text aroun
   };
 
 const translateContent = async (content, targetLanguage) => {
-  if (targetLanguage === 'English') return content;
-  const prompt = `Translate the following educational content into ${targetLanguage}. Maintain the formatting, tone, and markdown structure.\n\nContent:\n${content}`;
+  if (!content || targetLanguage === 'English') return content;
+  const prompt = `Translate the following educational content into ${targetLanguage}. Maintain the exact formatting, placeholders, and markdown structure.
+CRITICAL INSTRUCTION: Output ONLY the translated content. Do NOT write ANY conversational introduction, preamble, notes, or explanations (such as "Here is the translation" or "यहाँ सामग्री का हिंदी अनुवाद दिया गया है"). Return ONLY the direct translation.
+
+Content:
+${content}`;
+
   const aiResult = await callGeminiAPI(prompt);
-  return aiResult || content;
+  let text = aiResult ? aiResult.trim() : content;
+
+  // Remove common conversational AI preambles in various languages
+  text = text.replace(/^(यहाँ|यहाँ पर|यह|ये)?\s*(सामग्री|पाठ|अनुवाद|विवरण)?\s*(का|की|के)?\s*(हिंदी|मराठी|गुजराती|तमिल|तेलुगु|बंगाली)?\s*(अनुवाद|रूपांतरण)?\s*(दिया गया है|प्रस्तुत है|है|नीचे दिया गया है)[^\n]*:?\s*\n*/gim, '');
+  text = text.replace(/^यहाँ सामग्री का हिंदी अनुवाद[^\n]*\n*/gim, '');
+  text = text.replace(/^(here is the translation|translated content|translation:|here's the translated content)[^\n]*:?\s*\n*/gim, '');
+  text = text.replace(/^Sure, here is the translated (text|content)[^\n]*:?\s*\n*/gim, '');
+
+  return text.trim() || content;
 };
 
 module.exports = { askAITutor, askTeacherAssistant, generateTeacherContent, generateTeacherAssignment, generateQuiz, translateContent };

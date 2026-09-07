@@ -9,6 +9,7 @@ const studentRoutes = require('./routes/student.routes');
 const teacherRoutes = require('./routes/teacher.routes');
 const aiRoutes = require('./routes/ai.routes');
 const contentRoutes = require('./routes/content.routes');
+const uploadRoutes = require('./routes/upload.routes');
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.use('/api/student', studentRoutes);
 app.use('/api/teacher', teacherRoutes);
 app.use('/api/teacher/content', contentRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
